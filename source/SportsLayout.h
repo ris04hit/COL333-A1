@@ -276,7 +276,6 @@ class SportsLayout{
             chrono::duration<double> diff = curr_time-start_time;
             int i = 0;
             while (diff.count() < time_limit){
-                cout << i << " iteration, time = " << diff.count() << ", cost = " << cost << endl;
                 i++;
                 // Random Restart
                 auto pair = create_beam(beam_size, random_arr);
