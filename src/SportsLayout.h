@@ -15,15 +15,20 @@ class SportsLayout{
         int z,l;
         int** T;
         int** N;
-        int time_limit, cost;
+        int time_limit;
+        long long cost;
         int* mapping;
 
     public:
         SportsLayout(string inputfilename){
             readInInputFile(inputfilename);
-            mapping= new int[z];
-            for (int i = 0; i<z; i++) mapping[i] = i+1;
+            mapping= new int[l];
+            for (int i = 0; i<l; i++) mapping[i] = i+1;
             cost = cost_fn(mapping);
+        }
+
+        long long give_cost(){
+            return cost;
         }
 
         bool check_output_format(){
@@ -76,13 +81,13 @@ class SportsLayout{
         }
 
         long long cost_fn(int* mapZtoL){
-            long long cost=0;
+            long long cost_val=0;
             for(int i=0;i<z;i++){
                 for(int j=0;j<z;j++) {
-                    cost+=(long long)N[i][j]*(long long)T[mapZtoL[i]-1][mapZtoL[j]-1];
+                    cost_val+=(long long)N[i][j]*(long long)T[mapZtoL[i]-1][mapZtoL[j]-1];
                 }
             }
-            return cost;
+            return cost_val;
         }
 
         long long new_cost_fn(int* mapZtoL, int ind1, int ind2, long long cost_curr){
@@ -93,19 +98,21 @@ class SportsLayout{
             for (int i = 0; i<z; i++) cost_new -= (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
             // Modifying array
             int old1 = mapZtoL[ind1];
+            int old2 = mapZtoL[ind2];
             mapZtoL[ind1] = mapZtoL[ind2];
             // Adding new contribution of ind1
             for (int i = 0; i<z; i++) cost_new += (long long)N[i][ind1]*(long long)T[mapZtoL[i]-1][mapZtoL[ind1]-1];
             for (int i = 0; i<z; i++) cost_new += (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
-            // Removing earlier contribution of ind2
-            for (int i = 0; i<z; i++) cost_new -= (long long)N[i][ind2]*(long long)T[mapZtoL[i]-1][mapZtoL[ind2]-1];
-            for (int i = 0; i<z; i++) cost_new -= (long long)N[ind2][i]*(long long)T[mapZtoL[ind2]-1][mapZtoL[i]-1];
-            // Modifying array
-            int old2 = mapZtoL[ind2];
-            mapZtoL[ind2] = old1;
-            // Adding new contribution of ind2
-            for (int i = 0; i<z; i++) cost_new += (long long)N[i][ind2]*(long long)T[mapZtoL[i]-1][mapZtoL[ind2]-1];
-            for (int i = 0; i<z; i++) cost_new += (long long)N[ind2][i]*(long long)T[mapZtoL[ind2]-1][mapZtoL[i]-1];
+            if (ind2<z){
+                // Removing earlier contribution of ind2
+                for (int i = 0; i<z; i++) cost_new -= (long long)N[i][ind2]*(long long)T[mapZtoL[i]-1][mapZtoL[ind2]-1];
+                for (int i = 0; i<z; i++) cost_new -= (long long)N[ind2][i]*(long long)T[mapZtoL[ind2]-1][mapZtoL[i]-1];
+                // Modifying array
+                mapZtoL[ind2] = old1;
+                // Adding new contribution of ind2
+                for (int i = 0; i<z; i++) cost_new += (long long)N[i][ind2]*(long long)T[mapZtoL[i]-1][mapZtoL[ind2]-1];
+                for (int i = 0; i<z; i++) cost_new += (long long)N[ind2][i]*(long long)T[mapZtoL[ind2]-1][mapZtoL[i]-1];
+            }
             // Reversing changes to array
             mapZtoL[ind1] = old1;
             mapZtoL[ind2] = old2;
@@ -159,8 +166,9 @@ class SportsLayout{
                 cerr << "Failed to open the file for writing." << std::endl;
                 exit(0);
             }
-            for(int i=0;i<z;i++)
+            for(int i=0;i<z-1;i++)
                 outputFile<<mapping[i]<<" ";
+            outputFile<<mapping[z-1];
             // Close the file
             outputFile.close();
             cout << "Allocation written to the file successfully." << endl;
@@ -168,14 +176,14 @@ class SportsLayout{
 
         int* random_state_generator(int* random_arr){
             // Generates a random state
-            int* mapZtoL = new int[z];
+            int* mapZtoL = new int[l];
 
             // Creating random number generator engine
             random_device rd;
             mt19937 gen(rd());
 
             // Generating distinct random numbers using Fisher-Yates algorithm
-            for (int i = l-1; i>l-z-1; --i){
+            for (int i = l-1; i>=0; --i){
                 uniform_int_distribution<> dist(0,i);
                 int j = dist(gen);
                 swap(random_arr[i], random_arr[j]);
@@ -216,7 +224,7 @@ class SportsLayout{
             // updates neighbor state in beam array. Neighbour is defined by swapping elements in mapping
             long long new_cost;
             for (int i = 0; i<z; i++){
-                for (int j = i+1; j<z; j++){
+                for (int j = i+1; j<l; j++){
                     new_cost = new_cost_fn(state, i, j, cur_cost);
                     int index = beam_size;
                     int* trash_state = beam[beam_size-1];
@@ -233,7 +241,7 @@ class SportsLayout{
                     if (index+1<beam_size){
                         beam_cost[index+1] = new_cost;
                         beam[index+1] = trash_state;
-                        for (int k = 0; k<z; k++) beam[index+1][k] = state[k];
+                        for (int k = 0; k<l; k++) beam[index+1][k] = state[k];
                         swap(beam[index+1][i], beam[index+1][j]);
                     }
                 }
@@ -247,10 +255,10 @@ class SportsLayout{
                 long long sum_cost_initial = 0, sum_cost_final = 0;
                 for (int i = 0; i<stopping_num; i++) sum_cost_initial += beam_cost[i];
                 // creating new beam
-                int new_beam[beam_size][z];
+                int new_beam[beam_size][l];
                 long long new_beam_cost[beam_size];
                 for (int i = 0; i<beam_size; i++){
-                    for (int j = 0; j<z; j++){
+                    for (int j = 0; j<l; j++){
                         new_beam[i][j] = beam[i][j];
                     }
                     new_beam_cost[i] = beam_cost[i];
@@ -264,7 +272,18 @@ class SportsLayout{
             }
         }
 
-        void compute_allocation(int beam_size, int stopping_num){
+        pair<int,int> beam_param(){
+            // calculates optimal beam size according to some manual analysis
+            int beam_size = min(max((500000 * (long long) time_limit)/((long long) (l*l) * (long long) (l*z)), (long long) 1), (long long) 10000);
+            int stopping_num = max(beam_size/10, min(5, beam_size));
+            return {beam_size, stopping_num};
+        }
+
+        void compute_allocation(){
+            int beam_size = beam_param().first;
+            int stopping_num = beam_param().second;
+            // cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
+
             // Beam Search with random restart
             auto start_time = chrono::high_resolution_clock::now();
 
@@ -277,6 +296,7 @@ class SportsLayout{
             int i = 0;
             while (diff.count() < time_limit){
                 i++;
+                // cout << "iteration: " << i << ", time = " << diff.count() << ", cost = " << cost << endl;
                 // Random Restart
                 auto pair = create_beam(beam_size, random_arr);
                 int** beam = pair.first;
@@ -285,7 +305,7 @@ class SportsLayout{
                 beam_search(beam, stopping_num, beam_cost, beam_size);
                 if (beam_cost[0] < cost){                                           // Assume beam size to be greater than zero
                     cost = beam_cost[0];
-                    for (int i = 0; i<z; i++) mapping[i] = beam[0][i];
+                    for (int i = 0; i<l; i++) mapping[i] = beam[0][i];
                 }
                 delete[] beam;
                 delete[] beam_cost;

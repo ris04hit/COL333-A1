@@ -21,11 +21,11 @@ int main(int argc, char** argv )
     string outputfilename ( argv[2] );
     
     SportsLayout *s  = new SportsLayout( inputfilename );
-    s->compute_allocation(100, 10);
+    s->compute_allocation();
     s->write_to_file(outputfilename);
 
-    // long long cost = s->cost_fn (s->mapping);
-    // cout<< "cost:"<<cost<<endl;
+    long long cost = s->give_cost();
+    cout<< "cost: "<<cost<<endl;
 
 
     return 0;
