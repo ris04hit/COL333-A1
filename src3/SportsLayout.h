@@ -93,16 +93,18 @@ class SportsLayout{
         long long new_cost_fn(int* mapZtoL, int ind1, int ind2, long long cost_curr){
             // Computes the new cost when ind1 and ind2 of mapZtoL are swapped
             long long cost_new = cost_curr;
-            // Removing earlier contribution of ind1
-            for (int i = 0; i<z; i++) cost_new -= (long long)N[i][ind1]*(long long)T[mapZtoL[i]-1][mapZtoL[ind1]-1];
-            for (int i = 0; i<z; i++) cost_new -= (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
-            // Modifying array
             int old1 = mapZtoL[ind1];
             int old2 = mapZtoL[ind2];
-            mapZtoL[ind1] = mapZtoL[ind2];
-            // Adding new contribution of ind1
-            for (int i = 0; i<z; i++) cost_new += (long long)N[i][ind1]*(long long)T[mapZtoL[i]-1][mapZtoL[ind1]-1];
-            for (int i = 0; i<z; i++) cost_new += (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
+            if (ind1<z){
+                // Removing earlier contribution of ind1
+                for (int i = 0; i<z; i++) cost_new -= (long long)N[i][ind1]*(long long)T[mapZtoL[i]-1][mapZtoL[ind1]-1];
+                for (int i = 0; i<z; i++) cost_new -= (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
+                // Modifying array
+                mapZtoL[ind1] = old2;
+                // Adding new contribution of ind1
+                for (int i = 0; i<z; i++) cost_new += (long long)N[i][ind1]*(long long)T[mapZtoL[i]-1][mapZtoL[ind1]-1];
+                for (int i = 0; i<z; i++) cost_new += (long long)N[ind1][i]*(long long)T[mapZtoL[ind1]-1][mapZtoL[i]-1];
+            }
             if (ind2<z){
                 // Removing earlier contribution of ind2
                 for (int i = 0; i<z; i++) cost_new -= (long long)N[i][ind2]*(long long)T[mapZtoL[i]-1][mapZtoL[ind2]-1];
@@ -193,6 +195,21 @@ class SportsLayout{
             return mapZtoL;
         }
 
+        void modify_state(int* mapZtoL, long long& cost){
+            // Creating random number generator engine
+            random_device rd;
+            mt19937 gen(rd());
+            uniform_int_distribution<> dist(0,l-1);
+            int i = dist(gen), j = dist(gen);
+            int ind1 = min(i, j)%z, ind2 = max(i, j);
+            for (int p = ind2; p>=ind1; p--){
+                uniform_int_distribution<> dist(ind1, p);
+                j = dist(gen);
+                cost = new_cost_fn(mapZtoL, j, p, cost);
+                swap(mapZtoL[p], mapZtoL[j]);
+            }
+        }
+
         pair<int**, long long*> create_beam(int beam_size, int* random_arr){
             // Creates a random pair of beam and its cost for given beam_size
             int** beam = new int*[beam_size];
@@ -211,6 +228,13 @@ class SportsLayout{
                 }
             }
             return make_pair(beam, beam_cost);
+        }
+
+        void modify_beam(int beam_size, int** beam, long long* beam_cost){
+            // Modifies a random pair of beam and its cost for given beam_size
+            for (int i = 0; i<beam_size; i++){
+                modify_state(beam[i], beam_cost[i]);
+            }
         }
 
         void print_beam(int** beam, int beam_size, long long* beam_cost){
@@ -276,13 +300,13 @@ class SportsLayout{
             // calculates optimal beam size according to some manual analysis
             int beam_size = min(max((500000 * (long long) time_limit)/((long long) (l*l) * (long long) (l*z)), (long long) 1), (long long) 10000);
             int stopping_num = max(beam_size/10, min(5, beam_size));
-            return {beam_size, stopping_num};
+            return make_pair(beam_size, stopping_num);
         }
 
         void compute_allocation(){
             int beam_size = beam_param().first;
             int stopping_num = beam_param().second;
-            // cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
+            cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
 
             // Beam Search with random restart
             auto start_time = chrono::high_resolution_clock::now();
@@ -297,18 +321,23 @@ class SportsLayout{
             while (diff.count() < time_limit){
                 i++;
                 cout << "iteration: " << i << ", time = " << diff.count() << ", cost = " << cost << endl;
+                int** beam;
+                long long* beam_cost;
                 // Random Restart
-                auto pair = create_beam(beam_size, random_arr);
-                int** beam = pair.first;
-                long long* beam_cost = pair.second;
+                if (i==1){
+                    auto pair = create_beam(beam_size, random_arr);
+                    beam = pair.first;
+                    beam_cost = pair.second;
+                }
+                else{
+                    modify_beam(beam_size, beam, beam_cost);
+                }
                 // Performing beam search
                 beam_search(beam, stopping_num, beam_cost, beam_size);
                 if (beam_cost[0] < cost){                                           // Assume beam size to be greater than zero
                     cost = beam_cost[0];
                     for (int i = 0; i<l; i++) mapping[i] = beam[0][i];
                 }
-                delete[] beam;
-                delete[] beam_cost;
                 curr_time = chrono::high_resolution_clock::now();
                 diff = curr_time - start_time;
             }

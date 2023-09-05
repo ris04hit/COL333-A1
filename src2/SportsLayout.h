@@ -193,6 +193,25 @@ class SportsLayout{
             return mapZtoL;
         }
 
+        int* modify_state(int* random_arr){
+            // Modifies a state randomly
+            int* mapztol = new int[l];
+            for (int i = 0; i<l; i++) mapztol[i] = random_arr[i];
+
+            // Creating random number generator engine
+            random_device rd;
+            mt19937 gen(rd());
+            uniform_int_distribution<> dist(0,l-1);
+            int i = dist(gen), j = dist(gen);
+            int ind1 = min(i, j)%z, ind2 = max(i, j);
+            for (int p = ind2; p>=ind1; p--){
+                uniform_int_distribution<> dist(ind1, p);
+                j = dist(gen);
+                swap(mapztol[p], mapztol[j]);
+            }
+            return mapztol;
+        }
+
         pair<int**, long long*> create_beam(int beam_size, int* random_arr){
             // Creates a random pair of beam and its cost for given beam_size
             int** beam = new int*[beam_size];
@@ -276,13 +295,13 @@ class SportsLayout{
             // calculates optimal beam size according to some manual analysis
             int beam_size = min(max((500000 * (long long) time_limit)/((long long) (l*l) * (long long) (l*z)), (long long) 1), (long long) 10000);
             int stopping_num = max(beam_size/10, min(5, beam_size));
-            return {beam_size, stopping_num};
+            return make_pair(beam_size, stopping_num);
         }
 
         void compute_allocation(){
             int beam_size = beam_param().first;
             int stopping_num = beam_param().second;
-            // cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
+            cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
 
             // Beam Search with random restart
             auto start_time = chrono::high_resolution_clock::now();
@@ -294,6 +313,7 @@ class SportsLayout{
             auto curr_time = chrono::high_resolution_clock::now();
             chrono::duration<double> diff = curr_time-start_time;
             int i = 0;
+            int new_beam[stopping_num][l];
             while (diff.count() < time_limit){
                 i++;
                 cout << "iteration: " << i << ", time = " << diff.count() << ", cost = " << cost << endl;
@@ -301,11 +321,23 @@ class SportsLayout{
                 auto pair = create_beam(beam_size, random_arr);
                 int** beam = pair.first;
                 long long* beam_cost = pair.second;
+                if (i!=1){
+                    for (int j = 0; j<stopping_num; j++){
+                        beam[j] = new_beam[j];
+                        beam_cost[j] = cost_fn(beam[j]);
+                    }
+                }
                 // Performing beam search
                 beam_search(beam, stopping_num, beam_cost, beam_size);
                 if (beam_cost[0] < cost){                                           // Assume beam size to be greater than zero
                     cost = beam_cost[0];
                     for (int i = 0; i<l; i++) mapping[i] = beam[0][i];
+                }
+                for (int index=0; index<stopping_num; index++){
+                    int* new_state = modify_state(beam[index]);
+                    for (int j = 0; j<l; j++){
+                        new_beam[index][j] = new_state[j];
+                    }
                 }
                 delete[] beam;
                 delete[] beam_cost;
