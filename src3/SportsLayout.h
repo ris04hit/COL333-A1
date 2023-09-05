@@ -15,16 +15,18 @@ class SportsLayout{
         int z,l;
         int** T;
         int** N;
-        int time_limit;
+        float time_limit;
         long long cost;
         int* mapping;
+        string outputfile;
 
     public:
-        SportsLayout(string inputfilename){
+        SportsLayout(string inputfilename, string outputfilename){
             readInInputFile(inputfilename);
             mapping= new int[l];
             for (int i = 0; i<l; i++) mapping[i] = i+1;
             cost = cost_fn(mapping);
+            outputfile = outputfilename;
         }
 
         long long give_cost(){
@@ -173,7 +175,7 @@ class SportsLayout{
             outputFile<<mapping[z-1];
             // Close the file
             outputFile.close();
-            cout << "Allocation written to the file successfully." << endl;
+            // cout << "Allocation written to the file successfully." << endl;
         }
 
         int* random_state_generator(int* random_arr){
@@ -244,11 +246,13 @@ class SportsLayout{
             }
         }
 
-        void neighbour_state(int* state, int beam_size, int** beam, long long* beam_cost, long long cur_cost){
+        void neighbour_state(int* state, int beam_size, int** beam, long long* beam_cost, long long cur_cost, int* rand_arr1, int* rand_arr2){
             // updates neighbor state in beam array. Neighbour is defined by swapping elements in mapping
             long long new_cost;
-            for (int i = 0; i<z; i++){
-                for (int j = i+1; j<l; j++){
+            for (int ind1 = 0; ind1<z; ind1++){
+                int i = rand_arr1[ind1];
+                for (int ind2 = i+1; ind2<l; ind2++){
+                    int j = rand_arr2[ind2];
                     new_cost = new_cost_fn(state, i, j, cur_cost);
                     int index = beam_size;
                     int* trash_state = beam[beam_size-1];
@@ -272,10 +276,19 @@ class SportsLayout{
             }
         }
 
-        void beam_search(int** beam, int stopping_num, long long* beam_cost, int beam_size){
+        void beam_search(int** beam, int stopping_num, long long* beam_cost, int beam_size, int& iteration, chrono::duration<double>& diff, std::chrono::_V2::system_clock::time_point& start_time){
             // performs beam_search with stopping condition that cost of top <stopping_num> state remain same in two consecutive search
             bool condition = 1;
-            while (condition){
+            int rand_arr1[z], rand_arr2[l];
+            for (int i = 0; i<z; i++) rand_arr1[i] = i;
+            for (int i = 0; i<l; i++) rand_arr2[i] = i;
+
+            // Creating random number generator engine
+            random_device rd;
+            mt19937 gen(rd());
+
+            while (condition && (diff.count() + 2*diff.count()/(float) iteration < time_limit)){
+                iteration ++;
                 long long sum_cost_initial = 0, sum_cost_final = 0;
                 for (int i = 0; i<stopping_num; i++) sum_cost_initial += beam_cost[i];
                 // creating new beam
@@ -287,42 +300,62 @@ class SportsLayout{
                     }
                     new_beam_cost[i] = beam_cost[i];
                 }
+                // Generating distinct random numbers using Fisher-Yates algorithm
+                for (int i = l-1; i>=0; --i){
+                    uniform_int_distribution<> dist(0,i);
+                    int j = dist(gen);
+                    swap(rand_arr2[i], rand_arr2[j]);
+                    if (i<z){
+                        int j = dist(gen);
+                        swap(rand_arr1[i], rand_arr1[j]);
+                    }
+                }
                 // performing one step of beam search
                 for (int i = 0; i<beam_size; i++){
-                    neighbour_state(new_beam[i], beam_size, beam, beam_cost, new_beam_cost[i]);
+                    neighbour_state(new_beam[i], beam_size, beam, beam_cost, new_beam_cost[i], rand_arr1, rand_arr2);
                 }
                 for (int i = 0; i<stopping_num; i++) sum_cost_final += beam_cost[i];
                 if (sum_cost_final == sum_cost_initial) condition = 0;
+                if (beam_cost[0] < cost){                                           // Assume beam size to be greater than zero
+                    cost = beam_cost[0];
+                    for (int i = 0; i<l; i++) mapping[i] = beam[0][i];
+                    write_to_file(outputfile);
+                }
+                auto curr_time = chrono::high_resolution_clock::now();
+                diff = curr_time - start_time;
             }
         }
 
         pair<int,int> beam_param(){
             // calculates optimal beam size according to some manual analysis
-            int beam_size = min(max((500000 * (long long) time_limit)/((long long) (l*l) * (long long) (l*z)), (long long) 1), (long long) 10000);
+            int beam_size = min(max(((1000000)*((long long) time_limit))/((long long) (z*z) * (long long) (60*l)), (long long) 1), (long long) 10000);
             int stopping_num = max(beam_size/10, min(5, beam_size));
             return make_pair(beam_size, stopping_num);
         }
 
         void compute_allocation(){
+            // Starting new clock
+            auto start_time = chrono::high_resolution_clock::now();
+
+            // Storing beam parameters
             int beam_size = beam_param().first;
             int stopping_num = beam_param().second;
             cout << "beam size = " << beam_size << ", with stopping factor = " << stopping_num << endl;
 
-            // Beam Search with random restart
-            auto start_time = chrono::high_resolution_clock::now();
 
             // Creating a array of first l natural numbers to facilitate random_state_generator
             int random_arr[l];
             for (int i=0; i<l; i++) random_arr[i] = 1+i;
 
+            // Beam Search with random restart
             auto curr_time = chrono::high_resolution_clock::now();
             chrono::duration<double> diff = curr_time-start_time;
-            int i = 0;
-            while (diff.count() < time_limit){
+            int i = 0, iteration = 1;
+            int** beam;
+            long long* beam_cost;
+            while (diff.count() + 2*diff.count()/(float) iteration < time_limit){
                 i++;
-                cout << "iteration: " << i << ", time = " << diff.count() << ", cost = " << cost << endl;
-                int** beam;
-                long long* beam_cost;
+                cout << "restart: " << i << ", iteration = " << iteration << ", time = " << diff.count() << ", cost = " << cost << endl;
                 // Random Restart
                 if (i==1){
                     auto pair = create_beam(beam_size, random_arr);
@@ -333,14 +366,11 @@ class SportsLayout{
                     modify_beam(beam_size, beam, beam_cost);
                 }
                 // Performing beam search
-                beam_search(beam, stopping_num, beam_cost, beam_size);
-                if (beam_cost[0] < cost){                                           // Assume beam size to be greater than zero
-                    cost = beam_cost[0];
-                    for (int i = 0; i<l; i++) mapping[i] = beam[0][i];
-                }
+                beam_search(beam, stopping_num, beam_cost, beam_size, iteration, diff, start_time);
                 curr_time = chrono::high_resolution_clock::now();
                 diff = curr_time - start_time;
             }
+            cout << diff.count() << endl;
         }
 };
 

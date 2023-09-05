@@ -10,7 +10,7 @@ int main(int argc, char** argv){
         exit(0);
     }
 
-    int  time = stoi(argv[1]), z = stoi(argv[2]), l = stoi(argv[3]), range_min = stoi(argv[4]), range_max = stoi(argv[5]);
+    int  time = stof(argv[1]), z = stoi(argv[2]), l = stoi(argv[3]), range_min = stoi(argv[4]), range_max = stoi(argv[5]);
     string filename (argv[6]);
 
     // Creating random number generator engine

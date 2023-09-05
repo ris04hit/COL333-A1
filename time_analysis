@@ -1,0 +1,7 @@
+for beam size = 1
+z = 50
+l       time per iteration(ms)          num_restart         avg num_iter
+50      1.758                           2000                
+80      1.775                           2057
+110     1.820                           1941
+140     

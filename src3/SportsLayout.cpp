@@ -20,9 +20,8 @@ int main(int argc, char** argv )
     string inputfilename ( argv[1] );
     string outputfilename ( argv[2] );
     
-    SportsLayout *s  = new SportsLayout( inputfilename );
+    SportsLayout *s  = new SportsLayout( inputfilename, outputfilename );
     s->compute_allocation();
-    s->write_to_file(outputfilename);
 
     long long cost = s->give_cost();
     cout<< "cost: "<<cost<<endl;
